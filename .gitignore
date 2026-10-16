@@ -1,0 +1,14 @@
+# Git will ignore the following files for version control
+.vscode/extensions.json
+.vscode/launch.json
+.vscode/settings.json
+build/
+cmake/
+CMakeFiles/
+
+build.ninja
+cmake_install.cmake
+CMakeCache.txt
+CMakePresets.json
+compile_commands.json
+startup_stm32f446xx.s

@@ -1,0 +1,32 @@
+# Hardware config for Charging Control Board Go4-25
+module_name: "CCB"
+use_hw_timer: false # Disable hw timer based DMA update
+
+buckets:
+    high_frequency_ccb:
+        frequency_hz: 10
+        parameters:
+            chargingPowerLimit:
+                ADC: NON_ADC
+                sensor: NON_ADC
+                samples_buffered: 1
+
+
+    low_frequency_ccb:
+        frequency_hz: 4
+        parameters:
+            # Shut down circuit sensing
+            sdcStatus17:
+                ADC: NON_ADC
+                sensor: NON_ADC
+                samples_buffered: 1
+
+            sdcStatus18:
+                ADC: NON_ADC
+                sensor: NON_ADC
+                samples_buffered: 1
+
+            sdcStatus19:
+                ADC: NON_ADC
+                sensor: NON_ADC
+                samples_buffered: 1
