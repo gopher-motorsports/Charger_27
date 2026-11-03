@@ -28,6 +28,9 @@
 #include "status_led.h"
 #include "GopherCAN.h"
 #include "gopher_sense.h"
+#ifdef BRINGUP_TEST
+#include "bringup.h"
+#endif
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -222,6 +225,11 @@ int main(void)
   // Start J1772 PWM input capture
   HAL_TIM_IC_Start(&htim4, TIM_CHANNEL_1);
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2);
+
+#ifdef BRINGUP_TEST
+  // Bring-up build: run the test console instead of starting the RTOS. Never returns.
+  bringup_run();
+#endif
 
   /* USER CODE END 2 */
 

@@ -76,6 +76,21 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     "${CMAKE_SOURCE_DIR}/../Gopher_Sense/Build"
 )
 
+# Bring-up test firmware for the board test plan. Off by default, so the normal build is unchanged.
+# Enable with -DBRINGUP_TEST=ON; the result is <project>_bringup.elf. The HAL I2C driver is not part
+# of the generated project, so it is added here instead of in the CubeMX configuration.
+option(BRINGUP_TEST "Build the bring-up test firmware instead of the charger application" OFF)
+if(BRINGUP_TEST)
+    file(GLOB BRINGUP_SOURCES "${CMAKE_SOURCE_DIR}/bringup/*.c")
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+        ${BRINGUP_SOURCES}
+        "${CMAKE_SOURCE_DIR}/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_i2c.c"
+    )
+    target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/bringup")
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE BRINGUP_TEST HAL_I2C_MODULE_ENABLED)
+    set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${CMAKE_PROJECT_NAME}_bringup)
+endif()
+
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
@@ -94,6 +109,6 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -u _printf_float")
 # )
 # Convert output to hex and binary
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${PROJECT_NAME}> ${PROJECT_NAME}.hex
-    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${PROJECT_NAME}> ${PROJECT_NAME}.bin
+    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${PROJECT_NAME}> $<TARGET_FILE_BASE_NAME:${PROJECT_NAME}>.hex
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${PROJECT_NAME}> $<TARGET_FILE_BASE_NAME:${PROJECT_NAME}>.bin
 )

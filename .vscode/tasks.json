@@ -109,6 +109,56 @@
         },
         {
             "type": "shell",
+            "label": "Bring-up: CMake build",
+            "command": "cmake -S . -B build/Bringup -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/gcc-arm-none-eabi.cmake -DBRINGUP_TEST=ON && cmake --build build/Bringup",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Bring-up: Build",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Build GopherCAN",
+                "Build Gopher Sense",
+                "Bring-up: CMake build"
+            ],
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Build the bring-up test firmware (build/Bringup/Charger_27_bringup.elf)"
+        },
+        {
+            "type": "shell",
+            "label": "Bring-up: Flash (SWD)",
+            "command": "STM32_Programmer_CLI",
+            "args": [
+                "--connect",
+                "port=swd",
+                "--download",
+                "build/Bringup/Charger_27_bringup.elf",
+                "-hardRst",
+                "-rst",
+                "--start"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Bring-up: Build + Flash",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Bring-up: Build",
+                "Bring-up: Flash (SWD)"
+            ],
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Build and flash the bring-up test firmware over SWD"
+        },
+        {
+            "type": "shell",
             "label": "Start CAN Bootloader",
             "command": "python",
             "args": [
