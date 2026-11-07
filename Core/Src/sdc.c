@@ -4,6 +4,7 @@
 #include "sdc.h"
 #include <stdio.h>
 #include "GopherCAN.h"
+#include "gopher_sense.h"
 
 static uint8_t statSDC17 = 0;
 static uint8_t statSDC18 = 0;

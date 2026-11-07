@@ -1,4 +1,5 @@
 #include "bringup.h"
+#include "eeprom.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -206,6 +207,81 @@ static void eeprom_test(uint32_t hz)
               (unsigned long)bad, (unsigned long)twc_max, restored ? "yes" : "NO");
 }
 
+static const char *eeprom_status_name(eepromStatus_E s)
+{
+    switch (s) {
+    case EEPROM_OK:         return "OK";
+    case EEPROM_ERR_PARAM:  return "ERR_PARAM";
+    case EEPROM_ERR_NACK:   return "ERR_NACK";
+    case EEPROM_ERR_BUS:    return "ERR_BUS";
+    case EEPROM_ERR_BUSY:   return "ERR_BUSY";
+    case EEPROM_ERR_VERIFY: return "ERR_VERIFY";
+    }
+    return "?";
+}
+
+/* Exercises Core/Src/eeprom.c (the application driver) rather than the helpers above. The write
+ * starts at 0x05 so it is split into 3 + 8 + 5 bytes across three pages. */
+#define DRV_ADDR 0x05U
+
+static void driver_test(uint32_t hz)
+{
+    eeprom_S ee;
+    uint8_t original[PATTERN_LEN];
+    uint8_t pattern[PATTERN_LEN];
+    uint8_t probe[PATTERN_LEN];
+    eepromStatus_E s;
+    bool ok = true;
+
+    bp_printf("eeprom.c driver test at %lu kHz, bytes 0x%02X-0x%02X\n", (unsigned long)(hz / 1000U), DRV_ADDR,
+              DRV_ADDR + PATTERN_LEN - 1U);
+    if (!i2c_start(hz)) {
+        bp_result("i2c.driver", BP_FAIL, "I2C3 init failed");
+        return;
+    }
+    s = eepromInit(&ee, &hi2c3);
+    bp_printf("  eepromInit           %s\n", eeprom_status_name(s));
+    if (s != EEPROM_OK) {
+        bp_result("i2c.driver", BP_FAIL, "eepromInit returned %s", eeprom_status_name(s));
+        return;
+    }
+    s = eepromRead(&ee, DRV_ADDR, original, sizeof original);
+    bp_printf("  eepromRead original  %s\n", eeprom_status_name(s));
+    if (s != EEPROM_OK) {
+        bp_result("i2c.driver", BP_FAIL, "initial eepromRead returned %s", eeprom_status_name(s));
+        return;
+    }
+
+    for (uint32_t i = 0; i < PATTERN_LEN; i++) {
+        pattern[i] = (uint8_t)(0xA0U + i);
+    }
+    uint32_t t0 = bp_cycles();
+    s = eepromWrite(&ee, DRV_ADDR, pattern, sizeof pattern);
+    uint32_t write_us = bp_elapsed_us(t0);
+    bp_printf("  eepromWrite 16 bytes %s (%lu us for 3 pages)\n", eeprom_status_name(s), (unsigned long)write_us);
+    ok = ok && s == EEPROM_OK;
+
+    s = eepromVerify(&ee, DRV_ADDR, pattern, sizeof pattern);
+    bp_printf("  eepromVerify         %s\n", eeprom_status_name(s));
+    ok = ok && s == EEPROM_OK;
+
+    /* Out-of-range requests must be refused before any bus traffic. */
+    eepromStatus_E past_end = eepromRead(&ee, 0xF8U, probe, sizeof probe);
+    eepromStatus_E zero_len = eepromWrite(&ee, 0x00U, pattern, 0U);
+    bp_printf("  past-end read        %s (expect ERR_PARAM)\n", eeprom_status_name(past_end));
+    bp_printf("  zero-length write    %s (expect ERR_PARAM)\n", eeprom_status_name(zero_len));
+    ok = ok && past_end == EEPROM_ERR_PARAM && zero_len == EEPROM_ERR_PARAM;
+
+    bool restored = eepromWrite(&ee, DRV_ADDR, original, sizeof original) == EEPROM_OK
+                    && eepromVerify(&ee, DRV_ADDR, original, sizeof original) == EEPROM_OK;
+    if (!restored) {
+        bp_printf("  WARNING: original contents of 0x%02X-0x%02X could not be restored\n", DRV_ADDR,
+                  DRV_ADDR + PATTERN_LEN - 1U);
+    }
+    bp_result("i2c.driver", (ok && restored) ? BP_PASS : BP_FAIL, "write_3_pages=%luus restored=%s",
+              (unsigned long)write_us, restored ? "yes" : "NO");
+}
+
 static void scan(uint32_t hz)
 {
     uint32_t expected_hits = 0;
@@ -281,7 +357,8 @@ static void usage(void)
             "Eye diagram         i2c blast [100|400]   continuous EEPROM reads until a key (alias: eye, loop), default 400\n"
             "Who-am-I            i2c whoami            EEPROM ACK + random read (alias: id; the 24LC02B has no ID register)\n"
             "Peripheral ping     i2c ping [100|400]    ACK every address 0x08-0x77, expect exactly 0x50-0x57 (alias: scan)\n"
-            "Data transfer       i2c eeprom [100|400]  write 0x00-0x0F, then the inverse, read back, restore (default both)\n");
+            "Data transfer       i2c eeprom [100|400]  write 0x00-0x0F, then the inverse, read back, restore (default both)\n"
+            "Driver check        i2c driver [100|400]  run Core/Src/eeprom.c: 3-page write at 0x05, verify, range checks, restore\n");
 }
 
 int bp_cmd_i2c(int argc, char **argv)
@@ -308,6 +385,8 @@ int bp_cmd_i2c(int argc, char **argv)
             eeprom_test(100000U);
             eeprom_test(400000U);
         }
+    } else if (bp_streq(argv[1], "driver")) {
+        driver_test(argc == 3 ? hz : 400000U);
     } else if (bp_streq(argv[1], "loop") || bp_streq(argv[1], "eye") || bp_streq(argv[1], "blast")) {
         read_loop(argc == 3 ? hz : 400000U);
     } else {
